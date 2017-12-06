@@ -5,6 +5,7 @@ import os
 import httplib2
 import urllib
 from FSPC_Plot import fspc_plot
+from globalvariables import POINT_COUNTER
 
 link = 'http://barreldata.ucsc.edu/data_products/'
 version = "v05"
@@ -130,6 +131,7 @@ def bigmain():
                 localmageis_a = downloadmageis_to(constructmageis_aURL(date), downloadmageis)
                 localmageis_b = downloadmageis_to(constructmageis_bURL(date), downloadmageis)
             generalX(localballoon, localmageis_a, localmageis_b, payload_dict.get(date)[i:i+2], date)
+            print POINT_COUNTER
             os.remove(localballoon)
             #ideally, i would like the user to decide if they want to
             #delete the file or not.
@@ -141,10 +143,11 @@ def bigmain():
 
 
 
-#bigmain()
+bigmain()
 
 
 def main():
+    global POINT_COUNTER
     """Main function that, given a date, downloads
     the respective payloads and amgeis data to plot the ephemeris data"""
     payload_dict = maptime2payload("which_payloads.txt")
@@ -171,6 +174,7 @@ def main():
                 localmageis_a = downloadmageis_to(constructmageis_aURL(key), downloadmageis)
                 localmageis_b = downloadmageis_to(constructmageis_bURL(key), downloadmageis)
             generalX(localballoon, localmageis_a, localmageis_b, payload_dict.get(key)[i:i+2], key)
+            print POINT_COUNTER, "SOSA"
             os.remove(localballoon)
             #ideally, i would like the user to decide if they want to
             #delete the file or not.
@@ -208,7 +212,7 @@ def plot_fspc_data():
             os.remove(localballoon)
 
 
-plot_fspc_data()
+
 
 
 
