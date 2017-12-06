@@ -17,6 +17,7 @@ import numpy as np
 import numpy.ma as ma
 from spacepy import pycdf
 from scipy import interpolate
+from globalvariables import POINT_COUNTER
 
 
 
@@ -26,6 +27,7 @@ from scipy import interpolate
 # --------------------------------------------------#
 
 def generalX(balloon, mageis_a, mageis_b, payload, date):
+    global jointcounter
     """Function to plot data from the balloons and Van Allen Probes"""
 
     mageis = [mageis_a, mageis_b]
@@ -128,25 +130,25 @@ def generalX(balloon, mageis_a, mageis_b, payload, date):
                 if j == 2:
                     plots[1].plot(mlt_intersection[pair][0], mlt_intersection[pair][1], 'b+')
 
-        # pair = joint_intersection(time_m, time, L_Balloon, l_mageis, mlt_3A, mlt_mageis)
-        # if not pair.isEmpty:
-        #     joint_report(j, pair, date, payload, "joint.txt")
-        #check if there are multiple conjunctions
+
+        pair = joint_intersection(time_m, time, L_Balloon, l_mageis, mlt_3A, mlt_mageis)
+        pair.spliced()
+        joint_report(j, pair, date, payload, "joint.txt")
 
         if len(xsplicer(l_intersection)) > 1:
-            print "Multiplot ==L== \t"
+
             spliced_report(j, xsplicer(l_intersection), date, payload, "multitest.txt", "L")
+            spliced_report(j, xsplicer(l_intersection), date, payload, "Lconj.txt", "L")
         else:
-            print "Reg Plot L \t"
+
             report(j, l_intersection, date, payload, "multitest.txt", "L")
         if len(xsplicer(mlt_intersection)) > 1:
-            print "Multiplot ==MLT== \t"
-            spliced_report(j, xsplicer(mlt_intersection), date, payload, "multitest.txt", "L")
+
+            spliced_report(j, xsplicer(mlt_intersection), date, payload, "multitest.txt", "MLT")
+            spliced_report(j, xsplicer(mlt_intersection), date, payload, "MLTconj.txt", "MLT")
         else:
-            print "Reg Plot MLT \t"
+
             report(j, mlt_intersection, date, payload, "multitest.txt", "MLT")
-
-
 
 
   #========making the plots ===========#
@@ -174,13 +176,12 @@ def xsplicer(intersection_list):
     last_splice_index = 0
     for i in xrange(len(intersection_list)-2):
 
-        if (intersection_list[i+1][0]- intersection_list[i][0]).seconds > 3600:
-
+        if (intersection_list[i+1][0]-intersection_list[i][0]).seconds > 3600:
             spliced.append(intersection_list[last_splice_index:i])
-            last_splice_index = i
+            last_splice_index = i+1
     # add last portion of the list
-    if len(intersection_list[last_splice_index:]) > 300:
-        spliced.append(intersection_list[last_splice_index:])
+
+    spliced.append(intersection_list[last_splice_index:])
     if len(spliced) > 1:
         return spliced
     else:
@@ -238,13 +239,14 @@ class JointPoint(object):
         self.l_list.append(l_value)
         self.mlt_list.append(mlt_value)
 
-    def isEmpty(self):
-        if len(self.time_list) == 0 or len(self.time_list) == 0 or len(self.time_list) == 0:
+    def isSpliced(self):
+        if len(self.spliced_time_conj) != 0:
             return True
         else:
             return False
 
     def spliced(self):
+        global POINT_COUNTER
         if len(self.time_list) < 14:
             return -1
         spliced = []
@@ -255,17 +257,14 @@ class JointPoint(object):
                 self.spliced_time_conj.append(self.time_list[last_splice_index:i])
                 self.spliced_l_conj.append(self.l_list[last_splice_index:i])
                 self.spliced_mlt_conj.append(self.mlt_list[last_splice_index:i])
-                last_splice_index = i
-
+                last_splice_index = i+1
+                POINT_COUNTER += 1
         # add last portion of the list
-        if len(self.time_list[last_splice_index:]) > 300:
-            self.spliced_time_conj.append(self.time_list[last_splice_index:i])
-            self.spliced_l_conj.append(self.l_list[last_splice_index:i])
-            self.spliced_mlt_conj.append(self.mlt_list[last_splice_index:i])
-        if len(self.spliced_time_conj) > 1:
-            return 1
-        else:
-            return -1
+
+        self.spliced_time_conj.append(self.time_list[last_splice_index:i])
+        self.spliced_l_conj.append(self.l_list[last_splice_index:i])
+        self.spliced_mlt_conj.append(self.mlt_list[last_splice_index:i])
+        POINT_COUNTER += 1
 
     def conj_elapsed_seconds(self, conj):
         """elapsed seconds"""
@@ -275,6 +274,7 @@ class JointPoint(object):
         return (self.time_list[-1] - self.time_list[0]).seconds
 
 def joint_intersection(time, time_3A, l_balloon, l_mageis, mlt_balloon, mlt_mageis):
+    global jointcounter
     """looks for times within a certain threshold of each other L and MLT values
     and checks if their values are within a certain thershold of each other.
     returns a JointPoint that contains the list of joint conjunctions"""
@@ -282,39 +282,50 @@ def joint_intersection(time, time_3A, l_balloon, l_mageis, mlt_balloon, mlt_mage
     for t_time in range(len(time)-2):
         for  t_time3A in range(len(time_3A)-2):
             if abs(time[t_time] - time_3A[t_time3A]).seconds < 300:
-                if abs(mlt_mageis[t_time] - mlt_balloon[t_time3A]) < 1.5 \
-                      and abs(l_mageis[t_time] - l_balloon[t_time3A]) < 1:
+                if abs(mlt_mageis[t_time] - mlt_balloon[t_time3A]) < 1 \
+                      and abs(l_mageis[t_time] - l_balloon[t_time3A]) < .25:
 
-                    joint_point.append(time[t_time], l_balloon[t_time], mlt_balloon[t_time])
+                        joint_point.append(time[t_time], l_balloon[t_time], mlt_balloon[t_time])
+
+
 
     return joint_point
 
 
 def joint_report(j, jointpoint, date, payload, filename):
+    global POINT_COUNTER
+    """To a given file, prints out conjunctions where there are both MLT and L conjunctions.
+    Utilizes the JointPoint class."""
     file = open(filename, "a")
-    if len(jointpoint.spliced_time_conj) > 1:
+
+    if jointpoint.spliced_l_conj > 1:
+        print  "Enters spliced"
+        print POINT_COUNTER
         for time_conj, l_conj, mlt_conj in \
         zip(jointpoint.spliced_time_conj, jointpoint.spliced_l_conj, jointpoint.spliced_mlt_conj):
+            if j == 1:
+                column = [date, payload, "Mageis-A", "L & MLT", str(l_conj[0]),
+                        str(l_conj[-1]), str(mlt_conj[0]),
+                        str(mlt_conj[-1]), str(time_conj[0].time().hour) + ":" +
+                        str(time_conj[0].time().minute) +" TO "+
+                        str(time_conj[-1].time().hour) + ":" +
+                        str(time_conj[-1].time().minute),
+                        str(jointpoint.conj_elapsed_seconds(time_conj))]
 
-            column = [date, payload, "Mageis-A", "L & MLT", str(l_conj[0]),
-                      str(l_conj[-1]), str(mlt_conj[0]),
-                      str(mlt_conj[-1]), str(time_conj[0].time().hour) + ":" +
-                      str(time_conj[0].time().minute) +" TO "+
-                      str(time_conj[0].time().hour) + ":" +
-                      str(time_conj[0].time().minute),
-                      str(jointpoint.conj_elapsed_seconds(time_conj))]
+            else:
+                column = [date, payload, "Mageis-B", "L & MLT", str(l_conj[0]),
+                        str(l_conj[-1]), str(mlt_conj[0]),
+                        str(mlt_conj[-1]), str(time_conj[0].time().hour) + ":" +
+                        str(time_conj[0].time().minute) +" TO "+
+                        str(time_conj[-1].time().hour) + ":" +
+                        str(time_conj[-1].time().minute),
+                        str(jointpoint.conj_elapsed_seconds(time_conj))]
 
-
-            column = [date, payload, "Mageis-B", "L & MLT", str(l_conj[0]),
-                      str(l_conj[-1]), str(mlt_conj[0]),
-                      str(mlt_conj[-1]), str(time_conj[0].time().hour) + ":" +
-                      str(time_conj[0].time().minute) +" TO "+
-                      str(time_conj[0].time().hour) + ":" +
-                      str(time_conj[0].time().minute),
-                      str(jointpoint.conj_elapsed_seconds(time_conj))]
-
-
+            for i in xrange(len(column)):
+                file.write(column[i] + "\t")
+            file.write("\n")
     else:
+        print "does not enter spliced"
 
         if j == 1:
             column = [date, payload, "Mageis-A", "Range: L & MLT", str(jointpoint.l_list[0]),
@@ -326,7 +337,7 @@ def joint_report(j, jointpoint, date, payload, filename):
                       str(jointpoint.elapsed_seconds())]
 
         else:
-            column = [date, payload, "Mageis-A", "Range: L & MLT", str(jointpoint.l_list[0]),
+            column = [date, payload, "Mageis-B", "Range: L & MLT", str(jointpoint.l_list[0]),
                       str(jointpoint.l_list[-1]), str(jointpoint.mlt_list[0]),
                       str(jointpoint.mlt_list[-1]), str(jointpoint.time_list[0].time().hour) + ":" +
                       str(jointpoint.time_list[0].time().minute) + " TO " +
@@ -336,14 +347,17 @@ def joint_report(j, jointpoint, date, payload, filename):
 
 
 
-            for i in xrange(len(column)):
-                file.write(column[i] + "\t")
-            file.write("\n")
+        for i in xrange(len(column)):
+            file.write(column[i] + "\t")
+        file.write("\n")
 
 
 
 
     file.close()
+
+def get_jointcounter():
+    return jointcounter
 
 def elapsedsecs(conj):
     """ returns number of elapsed seconds of a conjunction """
@@ -378,10 +392,10 @@ def report(j, list, date, payload, filename, valname):
 def spliced_report(j, spliced, date, payload, filename, valname):
     """FOr multiple conjunctions: prints out a transposed column of data to desired file """
     file = open(filename, "a")
-    print spliced
+
     for conj in spliced:
     #prints out a transposed column of data.
-        print conj
+
         if len(conj) > 1:
             if j == 1:
                 column = [date, payload, "Mageis-A", valname, str(conj[0][1]), str(conj[-1][1]),
