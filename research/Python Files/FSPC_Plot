@@ -1,0 +1,333 @@
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import numpy.ma as ma
+import time
+import bisect
+import datetime
+import os
+import matplotlib.dates as mdates
+from spacepy import pycdf
+from scipy import interpolate
+import urllib
+
+
+
+ # ---- Andrew's plot of magnetic conjunctions -----
+#
+#
+# --------------------------------------------------#
+
+def generalX(balloon,mageis_a,mageis_b,payload,date):
+    mageis = [mageis_a, mageis_b]
+
+    graphed = [balloon, mageis_a, mageis_b]
+
+    cdf = pycdf.CDF(graphed[0])
+
+    # start = datetime.datetime(2015,8,10,14,0,0,0)
+    # stop = datetime.datetime(2015,8,10,18,0,0,0)
+    # start_ind = bisect.bisect_left(cdf['Epoch'], start)
+    # stop_ind = bisect.bisect_left(cdf['Epoch'], stop)
+    #then grab the data we want
+    time = cdf['Epoch'][...]
+    L_Balloon = cdf['L_Kp2'][...]
+
+#[start_ind:stop_ind]
+    mlt_3A = cdf['MLT_Kp2_T89c'][...]
+    cdf.close()
+
+
+
+    myFmt = mdates.DateFormatter('%H:%M')
+    ax = plt.subplot2grid((2,1),(0, 0))
+    ax1 = plt.subplot2grid((2,1),(1, 0))
+    plots = [ax,ax1]
+    plots[0].xaxis.set_major_formatter(myFmt)
+    plots[1].xaxis.set_major_formatter(myFmt)
+    plots[0].set_title(payload +"--" +str(date))
+
+
+   # set ylim in range 0-10 -- what does that do to the values?
+
+    #-----for the general case, shall we keep the limits the same, or generalize it
+
+    plots[0].set_ylim(3,10)
+    plots[1].set_ylim(0,24)
+
+    #====
+
+    plots[0].plot(time, L_Balloon, 'r.',label='balloon') # Balloon L-values in red
+    plots[0].set_xlabel('UT')
+    plots[0].set_ylabel('L-T89', color='red')
+
+    plots[1].plot(time, mlt_3A, 'r.') # Balloon MLT in red
+    plots[1].set_ylabel('MLT-T89', color='blue')
+
+    for j in range(1,3):
+        #read in CDF
+
+        cdf = pycdf.CDF(graphed[j])
+
+        time_e = cdf['Epoch'][...]
+        # then grab the data we want
+
+
+        # get time range indices for this file
+        start = datetime.datetime(2015,8,10,14,0,0,0)
+        stop = datetime.datetime(2015,8,10,18,0,0,0)
+        start_ind = bisect.bisect_left(cdf['Epoch'], start)
+        stop_ind = bisect.bisect_left(cdf['Epoch'], stop)
+
+        time_m = cdf['Epoch'][...]
+        L = cdf['L'][...]
+
+        MLT = cdf['MLT'][...]
+        cdf.close()
+
+        myFmt = mdates.DateFormatter('%H:%M')
+
+        #mageis A in green
+        if j == 1:
+            plots[0].plot(time_m, L,'g.')
+            plots[1].plot(time_m, MLT,'g.')
+            #mageis B in yellow
+        if j == 2:
+
+            plots[0].plot(time_m, L,'y.')
+            plots[1].plot(time_m, MLT,'y.')
+
+         #===========L=============#
+
+        Lintersection = intersection(time_m,time,L,L_Balloon) #plot the intersecting L -values in blue
+
+        if Lintersection != None: # make sure we have a value
+            for v in range(0, len(Lintersection) - 1):
+            #access the tuple and plot the intersections in blue
+                # First Van Allen probe MLT plot intersections in blue dots.
+                if j ==1:
+                    plots[0].plot(Lintersection[v][0],Lintersection[v][1],'b.')
+
+                if j == 2:
+                # second Van Allen probe MLT plot intesection in blue pluses
+                    plots[0].plot(Lintersection[v][0],Lintersection[v][1],'b+')
+
+         #===========MLT=============#
+
+        #plot the intersecting MLT -values in purple
+        MLTintersection = intersectionMLT(time_m, time , MLT, mlt_3A)
+        if MLTintersection != None: # make sure we have a value
+            for v in range(0, len(MLTintersection) - 1):
+                #access the tuple and plot the intersections in blue
+                if j == 1:
+                    plots[1].plot(MLTintersection[v][0],MLTintersection[v][1],'b.')
+                if j == 2:
+                    plots[1].plot(MLTintersection[v][0],MLTintersection[v][1],'b+')
+
+        #check if there are multiple conjunctions
+
+        if len(xsplicer(Lintersection)) > 1:
+            print "Multiplot ==L== \t"
+            multireport(j,xsplicer(Lintersection), date, payload,"multitest.txt", "L")
+        else:
+            print "Reg Plot L \t"
+            reporttofile(j,Lintersection, date, payload,"multitest.txt", "L")
+        if len(xsplicer(MLTintersection)) > 1:
+            print "Multiplot ==MLT== \t"
+            multireport(j,xsplicer(MLTintersection), date, payload,"multitest.txt", "L")
+        else:
+            print "Reg Plot MLT \t"
+            reporttofile(j,MLTintersection, date, payload,"multitest.txt", "MLT")
+
+  #========making the plots ===========#
+    plots[0].legend(bbox_to_anchor=(1.05, 0), loc='lower left', borderaxespad=0.)
+    plt.draw()
+    newpath = r'Users/sosa/Documents/Directory/plots/'
+    if not os.path.exists(newpath):
+        os.makedirs(newpath)
+    plt.savefig(newpath+str(date)+"-"+payload)
+    #have it so that it saves the image only and does not show it.
+    #plt.show(block=False)
+
+
+
+#==========intersection functions==============
+
+def xsplicer(intersection_list):
+    # if time is more than 60 minutes apart, include as a seperate conj
+    if len(intersection_list) < 14: print "LENGTH TO SHORT" ; return []
+    spliced = []
+    last_splice_index = 0
+    for i in xrange(len(intersection_list)-2):
+        #==??? do i consider the last portion of the list?Aka the last conjunction
+        if (intersection_list[i+1][0]- intersection_list[i][0]).seconds > 3600:
+
+            spliced.append(intersection_list[last_splice_index:i])
+            last_splice_index = i
+    # add last portion of the list
+    print "HI2"
+    if len(intersection_list[i:]) > 300: spliced.append(intersection_list[i:])
+    if len(spliced) > 1 : return spliced
+    else:
+        print "RETURNED EMPTY LIST"
+        return []
+    #after this,when plotting , one should do a for-loop that plots the spliced list
+
+
+
+def intersection(time,time_3A,L1,L2):
+     #looks for times within a certain threshold of each other, and checks
+     # if their values are within a certain thershold of each other.
+ #returns a list of tuples that contain points of approximate intersections
+    points = []
+    for t in range(0, len(time) - 1,30):
+        for  s in range(0, len(time_3A) - 1, 30):
+            if abs(time[t] - time_3A[s]).seconds < 300 :
+                # print "T1:" + str(time[t])
+                # print "T2:" + str(time_3A[s])
+                if abs(L1[t] - L2[s]) < .25 :
+                    point = (time[t],L1[t])
+                    points.append(point)
+    return points
+
+def intersectionMLT(time,time_3A,MLT,MLT2):
+     #looks for times within a certain threshold of each other, and checkks if their values are within a certain thershold of each other.
+ #returns a list of tuples that contain points of approximate intersections
+    points = []
+    for t in range(0, len(time) - 1,30):
+        for  s in range(0, len(time_3A) - 1, 30):
+            if abs(time[t] - time_3A[s]).seconds < 300 :
+                # print "T1:" + str(time[t])
+                # print "T2:" + str(time_3A[s])
+                if abs(MLT[t] - MLT2[s]) < 1 :
+                    point = (time[t],MLT[t])
+                    points.append(point)
+    return points
+
+
+
+
+def Lrange(list):
+    if len(list) > 1:
+        print ("L-Value Intersections Range: "  +  str(list[0][0].date()) +" at " +
+        str(list[0][0].time()) + " to " + str(list[len(list)-1][0].date())
+        + " at " + str(list[len(list)-1][0].time()) )
+def MLTrange(list):
+    if len(list) > 1:
+        print ("MLT-Value Intersections Range: "  +  str(list[0][0].date()) +" at " +
+        str(list[0][0].time()) + " to " + str(list[len(list)-1][0].date()) +
+         " at " + str(list[len(list)-1][0].time()) )
+
+def amboconj(l,mlt):
+    #if no conjunctions, return it
+    if len(l) == 0  or len(mlt) == 0:
+        return
+    else:
+        Lrange(l); MLTrange(mlt)
+
+def Lcloseconj(time,time_3A,L1,L2):
+    points = []
+    for t in range(0, len(time) - 1,30):
+        for  s in range(0, len(time_3A) - 1, 30):
+            if abs(time[t] - time_3A[s]).seconds < 300 :
+                # print "T1:" + str(time[t])
+                # print "T2:" + str(time_3A[s])
+                if abs(L1[t] - L2[s]) < 1 :
+                    point = (time[t],L1[t])
+                    points.append(point)
+    return points
+def MLTcloseconj(time,time_3A,L1,L2):
+    points = []
+    for t in range(0, len(time) - 1,30):
+        for  s in range(0, len(time_3A) - 1, 30):
+            if abs(time[t] - time_3A[s]).seconds < 300 :
+                # print "T1:" + str(time[t])
+                # print "T2:" + str(time_3A[s])
+                if abs(L1[t] - L2[s]) < 1.5 :
+                    point = (time[t],L1[t])
+                    points.append(point)
+    return points
+
+def report(payload,j,l,mlt):
+    if j == 1:
+        print payload + "--Mageis-A" + " L: " + reportrange(l) + "    MLT:  " + reportrange(mlt)
+    else:
+        print payload + "--Mageis-B" + " L: " + reportrange(l) + "    MLT:  " + reportrange(mlt)
+
+def reportrange(list):
+    if len(list) > 1:
+        return ("Intersections Range: " + str(list[0][1]) + " on " + str(list[0][0].date()) +" at " +str(list[0][0].time()) + " to " + str(list[len(list)-1][1]) + " on " + str(list[len(list)-1][0].date()) + " at " + str(list[len(list)-1][0].time()) )
+    else:
+        return "None"
+
+
+def elapsedsecs(list):
+    return (list[len(list)-2][0]-list[0][0]).seconds
+
+
+def reporttofile(j,list,date, payload,filename, valname):
+    #prints out a transposed column of data.
+    if len(list) > 1:
+        if j ==1:
+            column = [date, payload, "Mageis-A",valname,str(list[0][1]),  str(list[len(list)-1][1]), str(list[0][0].time().hour) + ":" +str(list[0][0].time().minute) +" TO "+
+         str(list[len(list)-1][0].time().hour) + ":" + str(list[len(list)-1][0].time().minute), str(elapsedsecs(list)) ]
+
+        else:
+            column = [date, payload, "Mageis-B",valname,str(list[0][1]),  str(list[len(list)-1][1]), str(list[0][0].time().hour) + ":" +str(list[0][0].time().minute) +" TO "+
+         str(list[len(list)-1][0].time().hour) + ":" + str(list[len(list)-1][0].time().minute), str(elapsedsecs(list)) ]
+
+        f = open(filename ,"a")
+        for i in xrange(len(column)):
+            f.write(column[i]+ "\t" )
+        f.write("\n")
+        f.close()
+
+
+def multireport(j,spliced,date, payload,filename,valname):
+
+    f = open(filename ,"a")
+    print spliced
+    for conj in spliced:
+    #prints out a transposed column of data.
+        print conj
+        if len(conj) > 1:
+            if j ==1:
+                column = [date, payload, "Mageis-A", valname, str(conj[0][1]),  str(conj[-1][1]), str(conj[0][0].time().hour) + ":" +str(conj[0][0].time().minute) +" TO "+
+                str(conj[-1][0].time().hour) + ":" + str(conj[-1][0].time().minute),  str(elapsedsecs(conj)) ]
+
+            else:
+                column = [date, payload, "Mageis-B",valname,str(conj[0][1]),  str(conj[len(conj)-1][1]), str(conj[0][0].time().hour) + ":" +str(conj[0][0].time().minute) +" TO "+
+                str(conj[len(conj)-1][0].time().hour) + ":" + str(conj[len(conj)-1][0].time().minute), str(elapsedsecs(conj)) ]
+
+            for i in xrange(len(column)):
+                f.write(column[i]+ "\t" )
+            f.write("\n")
+    f.close()
+
+
+def multijoint(j,list,list2, date, payload,filename):
+    #prints out a transposed column of data.
+    for conj, conj2 in zip(spliced, spliced2):
+        if j ==1:
+            Lcolumn = column = [date, payload, "Mageis-A","L",str(conj[0][1]),  str(conj[len(conj)-1][1]), str(conj[0][0].time().hour) + ":" +str(conj[0][0].time().minute) +" TO "+
+                str(conj[len(conj)-1][0].time().hour) + ":" + str(conj[len(conj)-1][0].time().minute), str(elapsedsecs(conj)) ]
+
+            MLTcolumn = [date, payload, "Mageis-A","MLT", str(list2[0][1]),  str(list2[len(list2)-1][1]),  str(list2[0][0].time().hour) +" TO "+
+            str(list2[len(list2)-1][0].time().hour) + ":" + str(list2[len(list2)-1][0].time().minute)]
+        else:
+            Lcolumn = column = [date, payload, "Mageis-B","L",str(conj[0][1]),  str(conj[len(conj)-1][1]), str(conj[0][0].time().hour) + ":" +str(conj[0][0].time().minute) +" TO "+
+                str(conj[len(conj)-1][0].time().hour) + ":" + str(conj[len(conj)-1][0].time().minute), str(elapsedsecs(conj)) ]
+
+            column = [date, payload, "Mageis-B","L",str(conj2[0][1]),  str(conj2[len(conj)-1][1]), str(conj2[0][0].time().hour) + ":" +str(conj2[0][0].time().minute) +" TO "+
+                str(conj2[len(conj2)-1][0].time().hour) + ":" + str(conj2[len(conj2)-1][0].time().minute), str(elapsedsecs(conj2)) ]
+
+        f = open(filename ,"a")
+        for i in xrange(0, 7):
+            f.write(Lcolumn[i]+ "\t" )
+        f.write("\n")
+        for i in xrange(0, 7):
+            f.write(MLTcolumn[i]+ "\t" )
+        f.write("\n")
+    f.close()
+
+
