@@ -17,7 +17,7 @@ import numpy as np
 import numpy.ma as ma
 from spacepy import pycdf
 from scipy import interpolate
-from globalvariables import POINT_COUNTER
+import globalvariables
 
 
 
@@ -142,6 +142,7 @@ def generalX(balloon, mageis_a, mageis_b, payload, date):
         else:
 
             report(j, l_intersection, date, payload, "multitest.txt", "L")
+            report(j, l_intersection, date, payload, "Lconj.txt", "L")
         if len(xsplicer(mlt_intersection)) > 1:
 
             spliced_report(j, xsplicer(mlt_intersection), date, payload, "multitest.txt", "MLT")
@@ -149,6 +150,7 @@ def generalX(balloon, mageis_a, mageis_b, payload, date):
         else:
 
             report(j, mlt_intersection, date, payload, "multitest.txt", "MLT")
+            report(j, mlt_intersection, date, payload, "MLTconj.txt", "MLT")
 
 
   #========making the plots ===========#
@@ -217,6 +219,8 @@ def intersection_MLT(time, time_3A, MLT1, MLT2):
 
     return points
 
+
+
 #create a list to hold all of these joint points
 class JointPoint(object):
 
@@ -246,7 +250,7 @@ class JointPoint(object):
             return False
 
     def spliced(self):
-        global POINT_COUNTER
+
         if len(self.time_list) < 14:
             return -1
         spliced = []
@@ -258,13 +262,14 @@ class JointPoint(object):
                 self.spliced_l_conj.append(self.l_list[last_splice_index:i])
                 self.spliced_mlt_conj.append(self.mlt_list[last_splice_index:i])
                 last_splice_index = i+1
-                POINT_COUNTER += 1
+
+
         # add last portion of the list
 
         self.spliced_time_conj.append(self.time_list[last_splice_index:i])
         self.spliced_l_conj.append(self.l_list[last_splice_index:i])
         self.spliced_mlt_conj.append(self.mlt_list[last_splice_index:i])
-        POINT_COUNTER += 1
+
 
     def conj_elapsed_seconds(self, conj):
         """elapsed seconds"""
@@ -274,7 +279,7 @@ class JointPoint(object):
         return (self.time_list[-1] - self.time_list[0]).seconds
 
 def joint_intersection(time, time_3A, l_balloon, l_mageis, mlt_balloon, mlt_mageis):
-    global jointcounter
+
     """looks for times within a certain threshold of each other L and MLT values
     and checks if their values are within a certain thershold of each other.
     returns a JointPoint that contains the list of joint conjunctions"""
@@ -293,16 +298,17 @@ def joint_intersection(time, time_3A, l_balloon, l_mageis, mlt_balloon, mlt_mage
 
 
 def joint_report(j, jointpoint, date, payload, filename):
-    global POINT_COUNTER
+
     """To a given file, prints out conjunctions where there are both MLT and L conjunctions.
     Utilizes the JointPoint class."""
     file = open(filename, "a")
 
     if jointpoint.spliced_l_conj > 1:
-        print  "Enters spliced"
-        print POINT_COUNTER
+        globalvariables.joint_conj_counter += len(jointpoint.spliced_l_conj)
+
         for time_conj, l_conj, mlt_conj in \
         zip(jointpoint.spliced_time_conj, jointpoint.spliced_l_conj, jointpoint.spliced_mlt_conj):
+
             if j == 1:
                 column = [date, payload, "Mageis-A", "L & MLT", str(l_conj[0]),
                         str(l_conj[-1]), str(mlt_conj[0]),
@@ -326,7 +332,7 @@ def joint_report(j, jointpoint, date, payload, filename):
             file.write("\n")
     else:
         print "does not enter spliced"
-
+        globalvariables.joint_conj_counter += 1
         if j == 1:
             column = [date, payload, "Mageis-A", "Range: L & MLT", str(jointpoint.l_list[0]),
                       str(jointpoint.l_list[-1]), str(jointpoint.mlt_list[0]),
@@ -356,8 +362,6 @@ def joint_report(j, jointpoint, date, payload, filename):
 
     file.close()
 
-def get_jointcounter():
-    return jointcounter
 
 def elapsedsecs(conj):
     """ returns number of elapsed seconds of a conjunction """
