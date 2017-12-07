@@ -1,3 +1,5 @@
+"""Plots CDF data, support for Epheremeris files and FSPC data."""
+
 #Andrew Sosanya, Dartmouth Balloon Group, BARREL RBSP.
 #Last updated October 12, 2017.
 from balloonplotter import *
@@ -5,7 +7,7 @@ import os
 import httplib2
 import urllib
 from FSPC_Plot import fspc_plot
-from globalvariables import POINT_COUNTER
+import globalvariables
 
 link = 'http://barreldata.ucsc.edu/data_products/'
 version = "v05"
@@ -39,6 +41,7 @@ def constructURL(date,payload):
     + payload+ "_"+ level +"_ephm_"+date+"_"+version+".cdf"
 
 def linkexists(link):
+    """check if link exits"""
     h = httplib2.Http()
     resp = h.request(link, 'HEAD')
     if int(resp[0]['status']) > 400:
@@ -46,6 +49,7 @@ def linkexists(link):
     else: return True
 
 def downloadto(link, location):
+    """File at given link downloads to given location"""
     filename = link[58:]
     urllib.urlretrieve(link, location + filename)
     return location + filename
@@ -53,26 +57,26 @@ def downloadto(link, location):
 
 
 def downloadmageis_to(link, location):
+    """File at given link downloads to given location"""
     filename = link[71:]
     urllib.urlretrieve(link, location + filename)
     return location + filename
 
 
 def constructmageis_aURL(date):
-     #splice the date
-     year = "/" + date[0:4] + "/"
-     if linkexists(mageisbase+ year + mageismid+"_"+date+"_"+mageis_aversion+".cdf"):
+    """Constructs a URL for Mageis A/RBSP A"""
 
-         return mageisbase+year+"rbspa_rel03_ect-mageis-L3"+"_"+date+"_"+mageis_aversion+".cdf"
+    year = "/" + date[0:4] + "/"
+    if linkexists(mageisbase+ year + mageismid+"_"+date+"_"+mageis_aversion+".cdf"):
+
+        return mageisbase+year+"rbspa_rel03_ect-mageis-L3"+"_"+date+"_"+mageis_aversion+".cdf"
 
 def constructmageis_bURL(date):
+    """Constructs a URL for Mageis B/RBSP B"""
     year = "/" + date[0:4] + "/"
-    ##====+EXCEPTIIONS=====harcoded====#
-
-    # 20140211 not work??
 
     if int(date) in (20140211, 20140116, 20140114, 20140122, 20140202,
-                    20140211, 20150813, 20150818, 20150821, 20140103):
+                     20140211, 20150813, 20150818, 20150821, 20140103):
 
 
         return mageisbaseB+year+"rbspb_rel03_ect-mageis-L3"+"_"+date+"_"+"v7.1.0"+".cdf"
@@ -107,8 +111,10 @@ def download_fspc(date, payload, link, location):
 
 
 
-def bigmain():
+def date_selector():
+
     run = True
+    print "IS this running?"
     while run:
         #ideally, I would want to have the user input the name of a text file.
         payload_dict = maptime2payload("which_payloads.txt")
@@ -120,36 +126,36 @@ def bigmain():
             print "Currently on: " + payload_dict.get(date)[i: i+2]
             if not linkexists(constructURL(date, payload_dict.get(date)[i: i+2])):
                 print "sorry, file does not exist in " + constructURL(date, payload_dict.get(date)[i:i+2])
-                if "y" == raw_input("Restart program y/n? "):
+                if raw_input("Restart program y/n? ") == "y":
                     return
                 return main()
             #download CDFs from the internet, store them in a local file, and delete.
 
             localballoon = downloadto(constructURL(date,payload_dict.get(date)[i:i+2] ),downloadpayloads)
-            print "Link for Payload " +payload_dict.get(date)[i: i+2] + " is: " + constructURL(date,payload_dict.get(date)[i:i+2])
+            print "Link for Payload " +payload_dict.get(date)[i: i+2] + " is: " + constructURL(date, payload_dict.get(date)[i:i+2])
             if i == 0:
                 localmageis_a = downloadmageis_to(constructmageis_aURL(date), downloadmageis)
                 localmageis_b = downloadmageis_to(constructmageis_bURL(date), downloadmageis)
             generalX(localballoon, localmageis_a, localmageis_b, payload_dict.get(date)[i:i+2], date)
-            print POINT_COUNTER
+            print globalvariables.joint_conj_counter
             os.remove(localballoon)
             #ideally, i would like the user to decide if they want to
             #delete the file or not.
-        if "n" == raw_input("Delete Mageis and Ephemeris files? y/n: "):
+        if raw_input("Delete Mageis and Ephemeris files? y/n: ") == "n" :
             os.remove(localmageis_a) ; os.remove(localmageis_b)
         print "Check output for direct links to ballon Ephermeris files."
-        if "y" == raw_input("Stop program? y/n: "):
+        if raw_input("Stop program? y/n: ") == "y":
             run = False
 
 
 
-bigmain()
 
 
-def main():
-    global POINT_COUNTER
+
+def Automated():
     """Main function that, given a date, downloads
     the respective payloads and amgeis data to plot the ephemeris data"""
+
     payload_dict = maptime2payload("which_payloads.txt")
     #date = raw_input('Starting date (YYYYMMDD), e.g 20130201 for February 1, 2013: ')
     #algorithm s.t we can avoid the pitfalls of the payload
@@ -174,7 +180,7 @@ def main():
                 localmageis_a = downloadmageis_to(constructmageis_aURL(key), downloadmageis)
                 localmageis_b = downloadmageis_to(constructmageis_bURL(key), downloadmageis)
             generalX(localballoon, localmageis_a, localmageis_b, payload_dict.get(key)[i:i+2], key)
-            print POINT_COUNTER, "SOSA"
+            print globalvariables.joint_conj_counter
             os.remove(localballoon)
             #ideally, i would like the user to decide if they want to
             #delete the file or not.
@@ -182,13 +188,15 @@ def main():
         os.remove(localmageis_a)
         os.remove(localmageis_b)
         #print "Check output for direct links to ballon Ephermeris files."
-
+    print "Final Number of Joint Conjunctions: " + str(globalvariables.joint_conj_counter)
 
 #main()
 
 
 
 def plot_fspc_data():
+    """Function plots the FSPC Values for the payloads of the BARREL Campaign.
+    Utilizes import from FSPC_Plot.py"""
     payload_dict = maptime2payload("which_payloads.txt")
     #date = raw_input('Starting date (YYYYMMDD), e.g 20130201 for February 1, 2013: ')
     #algorithm s.t we can avoid the pitfalls of the payload
@@ -216,3 +224,4 @@ def plot_fspc_data():
 
 
 
+Automated()
