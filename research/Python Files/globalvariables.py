@@ -3,3 +3,5 @@
 
 
 joint_conj_counter = 0
+l_conj_counter = 0
+mlt_conj_counter = 0
