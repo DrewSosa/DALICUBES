@@ -181,6 +181,7 @@ def Automated():
                 localmageis_b = downloadmageis_to(constructmageis_bURL(key), downloadmageis)
             generalX(localballoon, localmageis_a, localmageis_b, payload_dict.get(key)[i:i+2], key)
             print globalvariables.joint_conj_counter
+            print globalvariables.l_conj_counter
             os.remove(localballoon)
             #ideally, i would like the user to decide if they want to
             #delete the file or not.
