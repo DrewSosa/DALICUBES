@@ -137,18 +137,22 @@ def generalX(balloon, mageis_a, mageis_b, payload, date):
 
         if len(xsplicer(l_intersection)) > 1:
 
+            globalvariables.l_conj_counter += len(xsplicer(l_intersection))
             spliced_report(j, xsplicer(l_intersection), date, payload, "multitest.txt", "L")
             spliced_report(j, xsplicer(l_intersection), date, payload, "Lconj.txt", "L")
         else:
 
+            globalvariables.mlt_conj_counter += 1
             report(j, l_intersection, date, payload, "multitest.txt", "L")
             report(j, l_intersection, date, payload, "Lconj.txt", "L")
         if len(xsplicer(mlt_intersection)) > 1:
 
+            globalvariables.mlt_conj_counter += len(xsplicer(mlt_intersection))
             spliced_report(j, xsplicer(mlt_intersection), date, payload, "multitest.txt", "MLT")
             spliced_report(j, xsplicer(mlt_intersection), date, payload, "MLTconj.txt", "MLT")
         else:
 
+            globalvariables.mlt_conj_counter += 1
             report(j, mlt_intersection, date, payload, "multitest.txt", "MLT")
             report(j, mlt_intersection, date, payload, "MLTconj.txt", "MLT")
 
@@ -311,21 +315,21 @@ def joint_report(j, jointpoint, date, payload, filename):
 
             if j == 1:
                 column = [date, payload, "Mageis-A", "L & MLT", str(l_conj[0]),
-                        str(l_conj[-1]), str(mlt_conj[0]),
-                        str(mlt_conj[-1]), str(time_conj[0].time().hour) + ":" +
-                        str(time_conj[0].time().minute) +" TO "+
-                        str(time_conj[-1].time().hour) + ":" +
-                        str(time_conj[-1].time().minute),
-                        str(jointpoint.conj_elapsed_seconds(time_conj))]
+                          str(l_conj[-1]), str(mlt_conj[0]),
+                          str(mlt_conj[-1]), str(time_conj[0].time().hour) + ":" +
+                          str(time_conj[0].time().minute) +" TO "+
+                          str(time_conj[-1].time().hour) + ":" +
+                          str(time_conj[-1].time().minute),
+                          str(jointpoint.conj_elapsed_seconds(time_conj))]
 
             else:
                 column = [date, payload, "Mageis-B", "L & MLT", str(l_conj[0]),
-                        str(l_conj[-1]), str(mlt_conj[0]),
-                        str(mlt_conj[-1]), str(time_conj[0].time().hour) + ":" +
-                        str(time_conj[0].time().minute) +" TO "+
-                        str(time_conj[-1].time().hour) + ":" +
-                        str(time_conj[-1].time().minute),
-                        str(jointpoint.conj_elapsed_seconds(time_conj))]
+                          str(l_conj[-1]), str(mlt_conj[0]),
+                          str(mlt_conj[-1]), str(time_conj[0].time().hour) + ":" +
+                          str(time_conj[0].time().minute) +" TO "+
+                          str(time_conj[-1].time().hour) + ":" +
+                          str(time_conj[-1].time().minute),
+                          str(jointpoint.conj_elapsed_seconds(time_conj))]
 
             for i in xrange(len(column)):
                 file.write(column[i] + "\t")
